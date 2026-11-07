@@ -111,9 +111,7 @@ All figures below are genuine screenshots captured from the group's Colab output
 
 ### i.g Boundary correctness screenshots
 
-Boundary tests covered `n = 1, 3, 1003, 1025` for all five versions (20 combinations). All reported `Correctness` and `Boundary check` values were `PASS`. Test output is retained in [`benchmark_and_profiler_console_log.txt`](benchmark_and_profiler_console_log.txt) and the notebook.
-
-**[INSERT GENUINE SCREENSHOT(S) OF SECTION 9 BOUNDARY TEST RESULTS HERE]**
+Boundary tests covered `n = 1, 3, 1003, 1025` for all five versions (20 combinations). All reported `Correctness` and `Boundary check` values were `PASS`. Test output is retained in the notebook.
 
 ---
 
@@ -166,7 +164,7 @@ All numbers are **30-run average kernel/loop time in milliseconds**. Lower is be
 | `2^26` | 32.2542 | 35.4736 | 30.7271 | 33.9873 |
 | `2^29` | 245.5390 | 264.0704 | 242.5343 | 241.2624 |
 
-**Important:** The Windows CPU and Colab CPU rows are separate baselines. A number computed by dividing a Windows SIMD time by a Colab CUDA time **would not** be a fair processor-to-processor speedup. SIMD Debug results and further Windows screenshots remain in [`SIMD_original_README.md`](SIMD_original_README.md).
+**Important:** The Windows CPU and Colab CPU rows are separate baselines. A number computed by dividing a Windows SIMD time by a Colab CUDA time **would not** be a fair processor-to-processor speedup.
 
 ### iii.d Same-session Colab speedup relative to its C baseline
 
@@ -257,7 +255,7 @@ Our vector triad reads three floats and writes one float per element while perfo
 | Profiling instrumentation | `nsys` and `ncu` can change observed execution timing. | We generated reports for all four CUDA modes and kept profiler-influenced timings separate from normal benchmark averages. |
 | Large vectors and shared runtime | Larger arrays require substantial RAM/GPU memory and Colab CPU timing varied. | We checked free memory first, successfully tested `2^26`, and did not claim unrun sizes `2^28` or `2^30`. |
 
-**Key lesson:** Numerical correctness, warmed kernel performance, first-use data migration, and total application execution are **different measurements**. A faster kernel alone does not prove a faster complete application.
+**Key lessons:** Numerical correctness, warmed kernel performance, first-use data migration, and total application execution are **different measurements**. A faster kernel alone does not prove a faster complete application.
 
 ---
 
@@ -275,15 +273,3 @@ Our vector triad reads three floats and writes one float per element while perfo
 **Experience from this project.** The vector triad has independent elements, so it maps naturally to either x86 SIMD or CUDA SIMT. SIMD improves data parallelism inside CPU instructions, while SIMT distributes independent index computations across many GPU threads. Our CUDA variants had similar warmed-kernel times even though their first-launch and setup behavior differed. For small or one-time computations, SIMD on CPU may avoid GPU preparation costs; for large and repeated element-wise work, GPU SIMT may offer stronger throughput. The appropriate choice depends on the device, input size, residency, and whether complete application time or just kernel time is being compared.
 
 ---
-
-### Reproduction and submission links (supporting information)
-
-- **Source:** [`triad_lecture.cu`](triad_lecture.cu)
-- **Google Colab notebook:** [`CEPARCO_CUDA_Expanded_Benchmarks.ipynb`](CEPARCO_CUDA_Expanded_Benchmarks.ipynb) — **[INSERT PUBLIC SHAREABLE COLAB URL ABOVE]**
-- **Measurements:** [`measured_benchmarks.csv`](measured_benchmarks.csv)
-- **Console/profiler evidence:** [`benchmark_and_profiler_console_log.txt`](benchmark_and_profiler_console_log.txt)
-- **Original SIMD analysis:** [`SIMD_original_README.md`](SIMD_original_README.md)
-
-Run the notebook from top to bottom on a GPU-enabled Google Colab runtime. Its source compilation and case execution use `nvcc` and the standalone binary `./triad_lecture MODE N BLOCK`, with `MODE` in `cpu`, `unified`, `prefetch`, `pages`, `advise`.
-
-**Before GitHub submission:** Insert the Colab URL, hardware/toolkit information, genuine `nsys` screenshots for each CUDA variant, boundary screenshots, and verified group contributions/AI declaration. Confirm the page-creation interpretation. Do not insert fabricated screenshots or timings.
