@@ -1,13 +1,11 @@
 # CEPARCO — CUDA Vector Triad (Deep Dive: CUDA Concept and Programming)
-
-**Section:** S01  
-**Submission:** GitHub repository with an accessible Google Colab notebook  
 **Colab link:** https://colab.research.google.com/drive/10htYJpWGbe8PPoKBAHhRhe6KqZIGYhUG?usp=sharing
 
 ## 0. Group Members, Project Specifications, and AI Usage Declaration
 
 ### 0.1 Group members
 Saoud Abdulrahman, Justin Lance Lim, Kent Xavier Lopez, Francis Medin Nicolas 
+**Section:** S01  
 
 ### 0.2 Project specifications
 
