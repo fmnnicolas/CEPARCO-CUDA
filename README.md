@@ -2,7 +2,7 @@
 
 **Section:** S01  
 **Submission:** GitHub repository with an accessible Google Colab notebook  
-**Colab link:** **[INSERT WORKING GOOGLE COLAB SHARE LINK]**
+**Colab link:** https://colab.research.google.com/drive/10htYJpWGbe8PPoKBAHhRhe6KqZIGYhUG?usp=sharing
 
 ## 0. Group Members, Project Specifications, and AI Usage Declaration
 
