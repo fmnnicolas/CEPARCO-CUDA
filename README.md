@@ -1,48 +1,147 @@
-# CUDA Vector Triad — SIMD vs. SIMT Comparative Report
+# CEPARCO — CUDA Vector Triad (Deep Dive: CUDA Concept and Programming)
 
-**Course:** CEPARCO · **Section:** S01 · **Project:** Deep Dive: CUDA Concept and Programming
+**Section:** S01  
+**Submission:** GitHub repository with an accessible Google Colab notebook  
+**Colab link:** **[INSERT WORKING GOOGLE COLAB SHARE LINK]**
 
-**Group members:** Saoud Abdulrahman; Justin Lance Lim; Kent Xavier Lopez; Francis Medin Nicolas.
+## 0. Group Members, Project Specifications, and AI Usage Declaration
 
-## 1. Project specification and implementation
+### 0.1 Group members
+Saoud Abdulrahman, Justin Lance Lim, Kent Xavier Lopez, Francis Medin Nicolas 
 
-For single-precision (`float`) vectors of length `n`, the computation is `A[i] = B[i] + C[i] * D[i]`. The five implementations are (1) C/C++ CPU baseline, (2) CUDA Unified Memory without prefetch/advice, (3) CUDA with prefetching, (4) CUDA with prefetching plus CPU page touching, and (5) CUDA with prefetching, page touching, and memory advice.
+### 0.2 Project specifications
 
-Every CUDA version uses the **grid-stride loop**:
+The project extends the group's earlier SIMD vector-triad assignment to CUDA. For `n` single-precision (`float`) elements, calculate:
+
+\[
+A[i] = B[i] + C[i] \times D[i], \quad 0 \le i < n
+\]
+
+The input initialization is carried over from the original project:
 
 ```cpp
-__global__ void vectorTriadCUDA(int n, float *A, float *B, float *C, float *D) {
+B[i] = sin(i * 0.001);
+C[i] = cos(i * 0.002);
+D[i] = sin(i * 0.0005) + 1.5;
+```
+
+**Five required versions:**
+
+| Version | Implementation | Prefetch? | Page creation/touching? | Memory advice? |
+|---|---|---|---|---|
+| 1 | C/C++ CPU baseline | No | No | No |
+| 2 | CUDA grid-stride loop using Unified Memory | No | No | No |
+| 3 | CUDA grid-stride loop with prefetch | Yes | No | No |
+| 4 | CUDA grid-stride loop with prefetch + page creation | Yes | Yes* | No |
+| 5 | CUDA grid-stride loop with prefetch + page creation + memory advice | Yes | Yes* | Yes |
+
+
+All GPU variants run the same kernel:
+
+```cpp
+__global__ void vectorTriadCUDA(int n, float *A, float *B,
+                                float *C, float *D) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
+
     for (int i = index; i < n; i += stride) {
         A[i] = B[i] + C[i] * D[i];
     }
 }
 ```
 
-The input initialization is unchanged from our SIMD project: `B[i] = sin(i * 0.001)`, `C[i] = cos(i * 0.002)`, and `D[i] = sin(i * 0.0005) + 1.5`. All arrays use float storage. Our CUDA implementation uses `cudaMallocManaged()` and `cudaDeviceSynchronize()`. Prefetching and memory advice are included because the assignment asks for them. Compatibility wrappers adjust their function arguments for newer CUDA toolkits without changing the core kernel.
+The experiments use 256, 512 and 1024 threads per block; vector sizes `2^20`, `2^24` and `2^26`; and **30 timed runs per configuration**, excluding the separately reported first launch. `2^28` and `2^30` were **not run** in the submitted measurement set.
 
-## 2. Environment and measurement procedure
+**Correctness checks:** Compare GPU results with C reference calculations using an approximately `1e-5` relative-scaled tolerance. Display the first and last five elements of A. Check non-power-of-two and small sizes `n = 1, 3, 1003, 1025`, using 16 sentinel elements beyond output A to detect out-of-bounds writes. All recorded main-case and boundary checks passed; the largest reported main-case difference is approximately `2.38418579e-7`.
 
-| Item | Details |
+### 0.3 Execution environment and timing method
+
+| Setting | Recorded value / required action |
 |---|---|
-| CUDA execution | Google Colab, NVIDIA GPU — **[insert actual GPU model from `!nvidia-smi`]** |
-| Colab CPU | **[insert CPU model from `!lscpu`]** |
-| CUDA toolkit | **[insert actual `!nvcc --version` result]** |
-| Earlier SIMD | Windows, Visual Studio Debug and Release; CPU/flags **[insert verified details]** |
-| Input sizes | `2^20`, `2^24`, `2^26` elements (and smaller boundary tests) |
-| GPU threads per block | 256, 512, 1024 |
-| Timing repetitions | 30 measured runs after a separately reported first launch |
-| Timing method | CPU host steady clock; CUDA events for GPU kernel-only time |
-| Correctness | CPU reference, relative-scaled tolerance `1e-5`; 16 guard floats after A |
+| CUDA environment | Google Colab, NVIDIA GPU — **[INSERT ACTUAL GPU MODEL FROM `!nvidia-smi`]** |
+| Colab CPU | **[INSERT CPU MODEL FROM `!lscpu`]** |
+| Toolkit | **[INSERT CUDA VERSION FROM `!nvcc --version`]** |
+| Earlier SIMD environment | Windows + Visual Studio Debug and Release; **[INSERT CPU/COMPILER DETAILS IF AVAILABLE]** |
+| GPU timing | CUDA events, GPU kernel portion only |
+| CPU timing | Host steady clock, C loop portion only |
+| Reported values | 30-run average, minimum, maximum; first launch reported separately |
+| GPU setup | The `setup_ms` field excludes initialization and CPU page touching; **it is not total startup or end-to-end time** |
 
-Allocation, initialization, migration/prefetch preparation, checking, and (for page variants) CPU page touching are excluded from the main average kernel timings. All reported speedups are therefore **CPU loop time / warmed GPU kernel-only time**, not end-to-end speedups. The historical Windows data use an additional, different machine.
+Because the Windows SIMD measurements and Colab CUDA measurements were taken on different hardware and operating environments, they are presented together only for **context**, not as a controlled cross-platform speedup.
 
-## 3. Measured Colab results
+### 0.4 AI usage declaration
 
-### 3.1 Main comparison — 256 threads per block
+> ChatGPT was used to assist with drafting/simplifying the CUDA implementations, troubleshooting CUDA API version differences, organizing the Colab tests, and drafting the report. The group ran the software, obtained the measurements and profiler logs, and is responsible for checking and approving the submitted source and discussion. **Edit this declaration to match everyone's actual usage before submitting.
 
-| Version | `2^20` avg (ms) | `2^24` avg (ms) | `2^26` avg (ms) |
+---
+
+## i. Screenshots of Program Output with Correctness Check AND Execution Time for All Cases
+
+All figures below are genuine screenshots captured from the group's Colab outputs. Each execution displays `MODE`, vector size, block size, 30-run execution time statistics, correctness result, boundary status, and the beginning/end of output A. Tables in Section iii provide readable numeric results.
+
+### i.a C/C++ version
+
+![C baseline results](images/cpu_output.png)
+
+### i.b CUDA Unified Memory — no prefetch / no memory advice
+
+![CUDA Unified results](images/unified_output.png)
+
+### i.c CUDA with prefetch
+
+![CUDA Prefetch results](images/prefetch_output.png)
+
+### i.d CUDA with prefetch and page touching (experimental page-creation interpretation)
+
+![CUDA Pages results](images/pages_output.png)
+
+### i.e CUDA with prefetch, page touching, and memory advice
+
+![CUDA Advice results](images/advice_output.png)
+
+### i.f Comparative output and larger vector tests
+
+![Main benchmark results, first part](images/comparison_1.png)
+
+![Main benchmark results, second part](images/comparison_2.png)
+
+![Free-memory check before large vector test](images/available_memory.png)
+
+![Expanded benchmark results including 2^26](images/large_vector_results.png)
+
+### i.g Boundary correctness screenshots
+
+Boundary tests covered `n = 1, 3, 1003, 1025` for all five versions (20 combinations). All reported `Correctness` and `Boundary check` values were `PASS`. Test output is retained in [`benchmark_and_profiler_console_log.txt`](benchmark_and_profiler_console_log.txt) and the notebook.
+
+**[INSERT GENUINE SCREENSHOT(S) OF SECTION 9 BOUNDARY TEST RESULTS HERE]**
+
+---
+
+## ii. Screenshots of Nsight Systems (`nsys`) for All CUDA Variants
+
+All four `nsys` runs completed and generated `.nsys-rep` files. The 31 kernel instances per run include the first launch plus 30 additional launches. The table summarizes the most recent run logged in `benchmark_and_profiler_console_log.txt`.
+
+| CUDA variant | Recorded kernel instances | Median kernel (µs) | Mean including first (µs) |
+|---|---:|---:|---:|
+| Unified Memory | 31 | 65.438 | 191.100 |
+| Prefetch | 31 | 66.047 | 65.956 |
+| Prefetch + Pages | 31 | 67.551 | 67.520 |
+| Prefetch + Pages + Advice | 31 | 65.310 | 65.158 |
+
+The higher Unified mean results largely from the slow initial launch; the median better represents the typical launch in that profile. Nsight Compute (`ncu`) also produced one report per CUDA variant, but its instrumentation affects run times, so its timing output is **not** substituted into the ordinary benchmark table.
+
+### Nsight Systems Profiling Results
+
+![Nsight Systems Results](images/nsys_all_variants.png)
+---
+
+## iii. Comparative Table of Execution Times (C, CUDA Variants, x86-64, XMM, YMM)
+
+### iii.a Colab: all five versions, 256 threads/block
+
+All numbers are **30-run average kernel/loop time in milliseconds**. Lower is better. CUDA times exclude prefetch/migration preparation and other setup.
+
+| Implementation | `2^20` (ms) | `2^24` (ms) | `2^26` (ms) |
 |---|---:|---:|---:|
 | C/C++ (Colab) | 2.0994 | 31.1446 | 84.0676 |
 | CUDA Unified | 0.0695 | 1.0186 | 4.1323 |
@@ -50,134 +149,141 @@ Allocation, initialization, migration/prefetch preparation, checking, and (for p
 | CUDA Prefetch + Pages | 0.0691 | 1.0252 | 4.1188 |
 | CUDA Prefetch + Pages + Advice | 0.0692 | 1.0254 | 4.1191 |
 
-### 3.2 Speedup relative to the Colab C baseline (same session)
+### iii.b All block sizes at `2^26` (ms)
 
-**Speedup = average CPU time / average GPU kernel time.**
-
-| Version | `2^20` | `2^24` | `2^26` |
+| CUDA variant | 256 | 512 | 1024 |
 |---|---:|---:|---:|
-| CUDA Unified | 30.22× | 30.57× | 20.34× |
-| CUDA Prefetch | 30.57× | 30.13× | 20.42× |
-| CUDA Prefetch + Pages | 30.39× | 30.38× | 20.41× |
-| CUDA Prefetch + Pages + Advice | 30.33× | 30.37× | 20.41× |
+| Unified | 4.1323 | 4.1015 | 4.0843 |
+| Prefetch | 4.1163 | 4.0775 | 4.2155 |
+| Prefetch + Pages | 4.1188 | 4.0724 | 4.2297 |
+| Prefetch + Pages + Advice | 4.1191 | 4.0777 | 4.3801 |
 
-At `2^26`, the Colab CPU averaged **84.0676 ms** while Unified averaged **4.1323 ms**, and Prefetch averaged **4.1163 ms** (at 256 threads/block). The CUDA variants deliver roughly **20× lower steady-state kernel time** in this run, but this excludes overhead associated with moving and preparing the arrays. The CPU averages varied significantly between earlier Colab sessions, so this is an observed result for this specific run rather than a guaranteed ratio.
+### iii.c Historical SIMD experiment: Windows Visual Studio **Release** (ms)
 
-### 3.3 Effect of thread-block size at `2^26`
-
-| CUDA variant | 256 (ms) | 512 (ms) | 1024 (ms) | Best measured |
-|---|---:|---:|---:|---|
-| CUDA Unified | 4.1323 | 4.1015 | 4.0843 | 1024 |
-| CUDA Prefetch | 4.1163 | 4.0775 | 4.2155 | 512 |
-| CUDA Prefetch + Pages | 4.1188 | 4.0724 | 4.2297 | 512 |
-| CUDA Prefetch + Pages + Advice | 4.1191 | 4.0777 | 4.3801 | 512 |
-
-**Block recommendation:** 512 threads per block is a practical general choice in the `2^26` results: it is fastest for Prefetch, Pages, and Advice in this run, though Unified is slightly fastest at 1024. The 1024-thread configuration showed greater variation in some versions; one setting should not be called universally optimal without repeating full sessions.
-
-### 3.4 Memory preparation at `2^26`, 256 threads/block
-
-| Mode | Reported setup (ms) | Warmed kernel avg (ms) | First launch (ms) |
-|---|---:|---:|---:|
-| CUDA Unified | 0.0001 | 4.1323 | 194.9371 |
-| CUDA Prefetch | 69.8939 | 4.1163 | 4.2397 |
-| CUDA Prefetch + Pages | 91.4547 | 4.1188 | 4.2554 |
-| CUDA Prefetch + Pages + Advice | 161.5593 | 4.1191 | 4.2844 |
-
-Prefetching reduces the cost of some first GPU launches but takes preparation time itself. The Unified version has almost no *explicit* setup cost, yet its first launch is about 195 ms here, consistent with on-demand migration and startup effects. The page and advice variants add setup cost. Because CPU page touching, host initialization, and other work are outside the timed setup region, **these figures cannot establish end-to-end performance**. In a one-shot workload, more memory preparation is not necessarily worthwhile; repeated GPU processing can make upfront work easier to amortize.
-
-## 4. Historical SIMD results (Windows Visual Studio Release)
-
-| Input length | C (ms) | x86-64 (ms) | SIMD XMM (ms) | SIMD YMM (ms) |
+| n | C | x86-64 assembly | SIMD XMM (128-bit) | SIMD YMM (256-bit) |
 |---|---:|---:|---:|---:|
-| 2^20 | 0.2288 | 0.4212 | 0.2374 | 0.1930 |
-| 2^26 | 32.2542 | 35.4736 | 30.7271 | 33.9873 |
-| 2^29 | 245.5390 | 264.0704 | 242.5343 | 241.2624 |
+| `2^20` | 0.2288 | 0.4212 | 0.2374 | 0.1930 |
+| `2^26` | 32.2542 | 35.4736 | 30.7271 | 33.9873 |
+| `2^29` | 245.5390 | 264.0704 | 242.5343 | 241.2624 |
 
-The SIMD figures come from the earlier group README and ran on Windows, unlike the GPU figures collected on Colab. They show that explicit SIMD does not always improve on an optimized C compiler: XMM wins at `2^26`, while YMM is slightly faster at `2^29` (by about 0.5%). At `2^20`, scalar x86-64 assembly took 0.4212 ms against Release C at 0.2288 ms, meaning the assembly was approximately 84% longer, not “46% longer.” A compiler-vectorization explanation is plausible, but it has not been verified with compiler diagnostics or disassembly.
+**Important:** The Windows CPU and Colab CPU rows are separate baselines. A number computed by dividing a Windows SIMD time by a Colab CUDA time **would not** be a fair processor-to-processor speedup. SIMD Debug results and further Windows screenshots remain in [`SIMD_original_README.md`](SIMD_original_README.md).
 
-## 5. Nsight Systems (`nsys`) and Nsight Compute (`ncu`)
+### iii.d Same-session Colab speedup relative to its C baseline
 
-Both tools successfully produced reports for all four CUDA variants in the Colab session, using `2^20` elements and 256 threads/block. The profiler console output is preserved in [`benchmark_and_profiler_console_log.txt`](benchmark_and_profiler_console_log.txt). 
+Speedup is calculated as `average Colab C time / average CUDA kernel time`, not as full-program throughput.
 
-| Mode | `nsys` kernels | Median (µs) | Mean incl. first (µs) |
+| CUDA variant | `2^20` | `2^24` | `2^26` |
 |---|---:|---:|---:|
-| CUDA Unified | 31 | 65.438 | 191.100 |
-| CUDA Prefetch | 31 | 66.047 | 65.956 |
-| CUDA Prefetch + Pages | 31 | 67.551 | 67.520 |
-| CUDA Prefetch + Pages + Advice | 31 | 65.310 | 65.158 |
+| Unified | 30.22× | 30.57× | 20.34× |
+| Prefetch | 30.57× | 30.13× | 20.42× |
+| Prefetch + Pages | 30.39× | 30.38× | 20.41× |
+| Prefetch + Pages + Advice | 30.33× | 30.37× | 20.41× |
 
-The Unified summary mean is elevated by the first, migration-heavy kernel launch. The median is less sensitive to this outlier. Each `ncu` run successfully profiled one launch using multiple measurement passes. **The very high `ncu`-instrumented first-launch timings are not normal benchmark timings** and are excluded from speedup calculations. The available console log verifies profiler success but does not itself provide detailed memory-throughput counters; therefore we do not claim profiling proved that the computation is memory-bound.
+The raw collected averages are in [`measured_benchmarks.csv`](measured_benchmarks.csv). The full notebook also exports the experimental result table from the Colab session.
 
-**Real profiler screenshot slots (still required):**
-- `nsys` unified: **[insert actual screenshot of `nsys stats` or Nsight Systems timeline]**
-- `ncu` unified: **[insert actual screenshot of metric report / profiler output]**
-- `nsys` prefetch: **[insert actual screenshot of `nsys stats` or Nsight Systems timeline]**
-- `ncu` prefetch: **[insert actual screenshot of metric report / profiler output]**
-- `nsys` pages: **[insert actual screenshot of `nsys stats` or Nsight Systems timeline]**
-- `ncu` pages: **[insert actual screenshot of metric report / profiler output]**
-- `nsys` advise: **[insert actual screenshot of `nsys stats` or Nsight Systems timeline]**
-- `ncu` advise: **[insert actual screenshot of metric report / profiler output]**
+### iii.e `2^26` detailed CUDA timings — average / minimum / maximum (ms)
 
-## 6. SIMD versus SIMT
+These values come from the **30 timed runs** in `DATA.txt`, not the profiler-instrumented runs.
 
-In the x86 SIMD implementations, a single CPU instruction processes multiple floating-point values at once: XMM registers can hold four 32-bit floats and YMM registers eight. The program must explicitly handle vector lanes and remaining elements. In CUDA SIMT, the programmer writes one element operation for a thread and launches many threads; each thread computes its start index and advances by the grid stride. The GPU schedules threads in groups called warps, ordinarily 32 threads, and distributes many warps over streaming multiprocessors.
+| CUDA variant | Threads/block | Average (ms) | Minimum (ms) | Maximum (ms) |
+|---|---:|---:|---:|---:|
+| Unified | 256 | 4.1323 | 4.1104 | 4.1533 |
+| Unified | 512 | 4.1015 | 4.0941 | 4.1243 |
+| Unified | 1024 | 4.0843 | 4.0608 | 4.1329 |
+| Prefetch | 256 | 4.1163 | 4.1091 | 4.1267 |
+| Prefetch | 512 | 4.0775 | 4.0743 | 4.0820 |
+| Prefetch | 1024 | 4.2155 | 4.0487 | 4.5113 |
+| Pages | 256 | 4.1188 | 4.1113 | 4.1349 |
+| Pages | 512 | 4.0724 | 4.0700 | 4.0755 |
+| Pages | 1024 | 4.2297 | 4.0244 | 4.5154 |
+| Advise | 256 | 4.1191 | 4.1083 | 4.1240 |
+| Advise | 512 | 4.0777 | 4.0674 | 4.0892 |
+| Advise | 1024 | 4.3801 | 4.0251 | 4.5017 |
 
-SIMD advantages for this use case include low overhead for arrays already in CPU memory, good performance without device transfers, and relatively simple integration into a CPU application. Limitations include fewer simultaneous lanes and explicit remainder handling. CUDA advantages include high parallel throughput for large independent vectors and a scalable grid-stride loop. Its drawbacks include launch overhead, memory migration/transfer costs, available-device-memory limits, and variable performance in shared Colab environments. With one add and one multiply per element and multiple vector reads/writes, a bandwidth limit is plausible at large sizes, but we do not make a definitive memory-bound classification without bandwidth-counter evidence.
+---
 
-## 7. Problems encountered and solutions
+## iv. Analysis of Results
 
-1. **CUDA API version mismatch.** Older examples passed a numeric device ID to memory prefetch/advice calls, whereas the newer Colab CUDA toolkit expected a `cudaMemLocation` structure. Small version-specific wrapper functions fixed compilation while leaving the lecture-style grid-stride kernel unchanged.
-2. **Boundary handling.** Grid-stride loop condition `i < n` and 16 guard floats after A were tested using sizes 1, 3, 1003 and 1025. All 20 mode/size test combinations passed in the logged run.
-3. **First-launch overhead.** Unified Memory first access often includes substantial migration/startup cost. We measured the first launch separately and averaged the next 30 executions. This helps compare steady-state computation but is not end-to-end timing.
-4. **Profiler overhead.** Nsight Compute instruments and can replay launches. We kept profiling results separate from normal performance averages.
-5. **Memory management interpretation.** We documented page touching as an experimental assumption; the professor’s intended meaning should be verified, and the measured `setup_ms` does not cover its page-touch loop.
-6. **Memory constraints.** The `2^26` experiment succeeded with all correctness checks passing. `2^28` and `2^30` were not reported as executed, and must not be claimed as tested.
+### iv.a Kernel execution time
 
-## 8. Screenshots of actual notebook outputs
+For the largest tested size, `2^26`, the Colab C baseline averaged **84.0676 ms**, whereas the CUDA implementations averaged about **4.08–4.38 ms** across the measured block sizes. At 256 threads per block, CUDA Prefetch averaged **4.1163 ms**, corresponding to approximately **20.4× lower measured computation time** than the Colab C baseline. This does **not** include GPU allocation, prefetching, CPU page touching, data movement, or result reading, and therefore should not be called an end-to-end application speedup.
 
-**CPU baseline**
+The CUDA variants use the **same arithmetic and grid-stride kernel**. Their warmed kernel times are consequently close. The first launch differs more strongly. For example, at `2^26` and block size 256, Unified's first reported launch was **194.94 ms**, versus **4.24 ms** for Prefetch. This difference is consistent with memory-residency and initial-launch effects; explicit prefetching shifts some preparation work to the period before launch.
 
-![CPU baseline](images/cpu_output.png)
+| Version, `2^26`, 256 threads | First launch (ms) | Reported setup (ms) | 30-run avg (ms) |
+|---|---:|---:|---:|
+| Unified | 194.9371 | 0.0001 | 4.1323 |
+| Prefetch | 4.2397 | 69.8939 | 4.1163 |
+| Prefetch + Pages | 4.2554 | 91.4547 | 4.1188 |
+| Prefetch + Pages + Advice | 4.2844 | 161.5593 | 4.1191 |
 
-**CUDA Unified Memory**
+The reported setup figure omits initialization and page-touching cost. No full end-to-end times were measured, so the table is **not** evidence that one complete implementation is globally fastest.
 
-![CUDA Unified Memory](images/unified_output.png)
+### iv.b Speed performance across C, x86-64, XMM, YMM and CUDA
 
-**CUDA Prefetch**
+Our historical Windows Release results show that explicit SIMD did not consistently beat the C compiler. At `2^20`, YMM was fastest (0.1930 ms); at `2^26`, XMM was fastest (30.7271 ms); at `2^29`, YMM slightly beat XMM (241.2624 vs. 242.5343 ms, around 0.5%). The x86-64 scalar assembly version took **0.4212 ms** versus **0.2288 ms** for C at `2^20`—approximately **84% longer**. The proposition that Release C was auto-vectorized is plausible, but has **not** been verified using compiler output.
 
-![CUDA Prefetch](images/prefetch_output.png)
+CUDA provides many GPU threads for independent array elements. Our Colab computation-only results are faster than the **Colab CPU** baseline for the larger tested vectors. Because the Windows and Colab measurements use different systems, these results do not prove CUDA is universally faster than optimized XMM/YMM on the same hardware.
 
-**CUDA Prefetch + Pages**
+### iv.c Professor's guide questions
 
-![CUDA Prefetch + Pages](images/pages_output.png)
+**a) How does block size affect execution time across different vector sizes and maximum blocks? Which block size do you recommend?**
 
-**CUDA Prefetch + Pages + Advice**
+Block size changes the number of threads within a CUDA block and affects the grid configuration and how the GPU schedules available work. Larger blocks are not automatically faster. In our `2^26` experiments, **512 threads/block** was fastest for Prefetch (**4.0775 ms**), Pages (**4.0724 ms**), and Advice (**4.0777 ms**); Unified was fastest with **1024 threads/block** (**4.0843 ms**). In the smaller `2^20` and `2^24` experiments, the differences were generally smaller and varied by version. Therefore, we recommend **512 threads/block** as a stable overall choice for this workload and GPU session, not a universally optimal setting. The experiment tested block sizes 256, 512, and 1024; it did not prove that every possible grid/block count is optimal or fully investigate a hardware-specific maximum grid configuration.
 
-![CUDA Prefetch + Pages + Advice](images/advice_output.png)
+**b) Is prefetching always recommended, or should CUDA manage memory? Give examples where each is better.**
 
-**Main comparative output, first page**
+**Prefetching is not always better.** When inputs are initialized on the CPU and will be used by a sizable GPU computation, prefetching can move managed pages toward the GPU in advance and reduce page-fault delays in the initial kernel. Our `2^26` Unified first launch was around **194.94 ms** while the Prefetch first launch was around **4.24 ms**, but Prefetch had about **69.89 ms of separately reported setup**, excluding some preparation. This means prefetching can benefit launch latency without guaranteeing the fastest full operation. Prefetch is especially worth considering when large arrays will be reused for several GPU kernels or the access pattern is known. CUDA-managed on-demand migration can be preferable for small, one-off, or unpredictable workloads where extra upfront work is unnecessary. Repeated warmed kernel times were similar in our tests, so prefetching did not meaningfully accelerate the core arithmetic after residency was established.
 
-![Main comparative output, first page](images/comparison_1.png)
+**c) Between SIMD and SIMT, which is faster? Give examples where one is better than the other.**
 
-**Main comparative output, second page**
+**Neither is always faster.** CPU SIMD (XMM/YMM) is useful for small or medium arrays already in CPU memory, low-latency CPU functions, or programs where GPU memory preparation and launch costs are undesirable. GPU SIMT is useful when millions of independent operations can run across many threads—for example, our vector triad, image processing, and other large element-wise workloads. Our Colab GPU kernels outperformed the Colab scalar C loop for the large tested arrays, but the historic SIMD comparison was run on a different Windows system. Therefore, we **cannot claim a controlled SIMT-over-SIMD speedup** from these measurements alone.
 
-![Main comparative output, second page](images/comparison_2.png)
+### iv.d Broader performance limitations
 
-**Memory check before large benchmark**
+Our vector triad reads three floats and writes one float per element while performing one addition and one multiplication. This gives the computation relatively little arithmetic work per byte moved, suggesting memory bandwidth may be important at large sizes. However, the supplied `ncu` logs confirm profiling **ran** but do not provide measured memory bandwidth or utilization counters, so we do **not** claim bandwidth limitation has been directly proven. The Colab CPU baseline also varied significantly between sessions; changing hardware allocation, system load, and measurement noise can affect observed speedup.
 
-![Memory check before large benchmark](images/available_memory.png)
+---
 
-**Expanded benchmark summary including 2^26**
+## v. Problems Encountered, Solutions, Methodology, and Lessons Learned
 
-![Expanded benchmark summary including 2^26](images/large_vector_results.png)
+| Problem | What happened | How the group handled it / what we learned |
+|---|---|---|
+| CUDA API-version difference | Colab's newer toolkit rejected older numeric-device arguments to `cudaMemPrefetchAsync()` and `cudaMemAdvise()`. | Version-aware compatibility code supplied the newer memory-location argument form, while keeping the grid-stride kernel simple and lecture-aligned. |
+| Unified Memory first-launch delay | Unified Memory's first launch could be much slower than the following 30 launches. | We reported first launch separately and used 30 subsequent timings for the warmed-kernel comparison. |
+| Boundary conditions | CUDA thread counts do not always divide the vector length exactly. | `i < n` in the grid-stride loop plus 16 guard floats; verified `n=1`, `3`, `1003`, `1025` with PASS for every implementation. |
+| Comparing memory techniques | Prefetching, page touching, and advice add extra preparation work. | We reported memory setup apart from kernel time and avoided treating those as complete application times. **CPU page touching is not included in the existing setup timer.** |
+| Understanding page creation | The assignment states “page creation” but doesn't specify a distinct command. | We implemented CPU page touching as a documented experiment; **professor confirmation is pending**, so we do not claim it is the only or necessarily intended interpretation. |
+| Profiling instrumentation | `nsys` and `ncu` can change observed execution timing. | We generated reports for all four CUDA modes and kept profiler-influenced timings separate from normal benchmark averages. |
+| Large vectors and shared runtime | Larger arrays require substantial RAM/GPU memory and Colab CPU timing varied. | We checked free memory first, successfully tested `2^26`, and did not claim unrun sizes `2^28` or `2^30`. |
 
-**Boundary evidence:** the text log includes all 20 PASS results. Add screenshots of the Section 9 cell showing 1003 and 1025 for SIMD XMM/YMM where relevant, and CUDA variants. **[Actual complete boundary screenshot still to add.]**
+**Key lesson:** Numerical correctness, warmed kernel performance, first-use data migration, and total application execution are **different measurements**. A faster kernel alone does not prove a faster complete application.
 
-## 9. Run / reproduce
+---
 
-**Google Colab link:** **[INSERT shareable Colab notebook URL and verify viewer access]**
+## vi. SIMD vs. SIMT — Differences, Pros, and Cons for Vector Triad
 
-## 10. AI usage declaration
+| Aspect | CPU SIMD (x86-64 XMM/YMM) | GPU SIMT (CUDA) |
+|---|---|---|
+| Parallel execution | One vector instruction processes several data values at once | Many threads run the same kernel instructions on different elements, scheduled in warps |
+| How our code expresses parallelism | Explicit XMM/YMM packed instructions | One element calculation per thread, repeated using a grid-stride loop |
+| Vector width / grouping | XMM 128-bit = 4 floats; YMM 256-bit = 8 floats | Typical warp groups 32 CUDA threads; number of active warps depends on the GPU |
+| Boundaries | Tail/remainder handling is required when length does not divide vector width | `for (i = index; i < n; i += stride)` naturally avoids out-of-range indices |
+| Advantages for our task | Low setup overhead; good when data is already on CPU; can integrate into CPU code | Many independent elements can be processed concurrently; efficient for very large arrays |
+| Disadvantages for our task | Limited vector width; requires attention to registers/remaining elements | Device launch overhead, managed-memory migration/prefetch overhead, GPU memory capacity, and runtime variability |
 
-We used ChatGPT to help draft and simplify the CUDA implementations, resolve CUDA API-version errors, organize Google Colab experiments, and prepare the benchmark report. Our group executed the programs, gathered timing and profiler output, checked correctness, and reviewed the final submitted work.
+**Experience from this project.** The vector triad has independent elements, so it maps naturally to either x86 SIMD or CUDA SIMT. SIMD improves data parallelism inside CPU instructions, while SIMT distributes independent index computations across many GPU threads. Our CUDA variants had similar warmed-kernel times even though their first-launch and setup behavior differed. For small or one-time computations, SIMD on CPU may avoid GPU preparation costs; for large and repeated element-wise work, GPU SIMT may offer stronger throughput. The appropriate choice depends on the device, input size, residency, and whether complete application time or just kernel time is being compared.
 
+---
+
+### Reproduction and submission links (supporting information)
+
+- **Source:** [`triad_lecture.cu`](triad_lecture.cu)
+- **Google Colab notebook:** [`CEPARCO_CUDA_Expanded_Benchmarks.ipynb`](CEPARCO_CUDA_Expanded_Benchmarks.ipynb) — **[INSERT PUBLIC SHAREABLE COLAB URL ABOVE]**
+- **Measurements:** [`measured_benchmarks.csv`](measured_benchmarks.csv)
+- **Console/profiler evidence:** [`benchmark_and_profiler_console_log.txt`](benchmark_and_profiler_console_log.txt)
+- **Original SIMD analysis:** [`SIMD_original_README.md`](SIMD_original_README.md)
+
+Run the notebook from top to bottom on a GPU-enabled Google Colab runtime. Its source compilation and case execution use `nvcc` and the standalone binary `./triad_lecture MODE N BLOCK`, with `MODE` in `cpu`, `unified`, `prefetch`, `pages`, `advise`.
+
+**Before GitHub submission:** Insert the Colab URL, hardware/toolkit information, genuine `nsys` screenshots for each CUDA variant, boundary screenshots, and verified group contributions/AI declaration. Confirm the page-creation interpretation. Do not insert fabricated screenshots or timings.
