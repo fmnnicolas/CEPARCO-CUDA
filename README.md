@@ -221,7 +221,7 @@ Our historical Windows Release results show that explicit SIMD did not consisten
 
 CUDA provides many GPU threads for independent array elements. Our Colab computation-only results are faster than the **Colab CPU** baseline for the larger tested vectors. Because the Windows and Colab measurements use different systems, these results do not prove CUDA is universally faster than optimized XMM/YMM on the same hardware.
 
-### iv.c Professor's guide questions
+### iv.c Guide questions
 
 **a) How does block size affect execution time across different vector sizes and maximum blocks? Which block size do you recommend?**
 
